@@ -73,8 +73,8 @@ docker compose -f docker-compose.prod.yml up -d --build
 # Backend
 cd app
 pip install -r requirements.txt
-export DATABASE_URL=postgresql://marinasan:pass@localhost:5432/marinasan
-export MARINASAN_JWT_SECRET=dev-secret
+export DATABASE_URL=postgresql://marinasun:pass@localhost:5432/marinasun
+export MARINASUN_JWT_SECRET=dev-secret
 alembic upgrade head
 python seed.py
 python app.py  # or: gunicorn -c gunicorn_config.py 'app:create_app()'
@@ -89,9 +89,9 @@ npm run dev  # http://localhost:5173
 
 | Variable | Required | Description |
 |---|---|---|
-| `MARINASAN_JWT_SECRET` | Yes | >=32 byte hex (`openssl rand -hex 32`) |
+| `MARINASUN_JWT_SECRET` | Yes | >=32 byte hex (`openssl rand -hex 32`) |
 | `POSTGRES_PASSWORD` | Yes | DB password |
-| `POSTGRES_USER` / `POSTGRES_DB` | No | default `marinasan` |
+| `POSTGRES_USER` / `POSTGRES_DB` | No | default `marinasun` |
 | `SMTP_*` / `EWS_*` | No | email notifications |
 | `CORS_ORIGINS` | No | allowed origins |
 
