@@ -1,77 +1,73 @@
-# ماریناسان — سیستم درخواست خرید (Marinasan Purchase System)
+# MarinaSun Purchase Order System
 
-سیستم مدیریت درخواست خرید با گردش تایید چندسطحی، امضای دیجیتال و تولید سند چاپی. بک‌اند Flask + PostgreSQL + Redis، فرانت‌اند React + Vite، استقرار با Docker Compose + Nginx.
+Enterprise-grade Purchase Request & Approval Platform — dynamic multi-level workflow, immutable digital signatures, and automated PDF issuance. Production-ready with Docker Compose, PostgreSQL, Redis, Nginx, and Prometheus monitoring.
 
----
+## Highlights
 
-## ویژگی‌ها
+- **Dynamic Approval Workflow** — amount-based routing via `approval_rules`, sequential sign-off, and auto-escalation
+- **Immutable Digital Signatures** — Base64 PNG + IP / User-Agent / timestamp audit trail
+- **Return for Documents** — `returned_for_documents` flow with resubmission and notifications
+- **Document Engine** — unique `PR-xxxx` numbering, HTML/PDF with SHA256 verification
+- **Notifications** — SMTP & Microsoft Exchange (EWS) with fallback
+- **Security** — JWT auth, Redis-backed login rate limit (5/5min), CORS, JSON structured logs
+- **Observability** — `/api/health`, `/metrics`, Prometheus + Grafana
 
-- ثبت درخواست خرید با اقلام، مبلغ کل خودکار و شماره درخواست یکتا (`PR-xxxx`)
-- گردش تایید پویا بر اساس مبلغ (قابل تنظیم در `approval_rules`)
-- امضای دیجیتال (Base64 PNG)، ثبت IP و User-Agent
-- بازگشت برای تکمیل مدارک و ارسال مجدد
-- تولید سند چاپی HTML/PDF با امضاها
-- اعلان ایمیل (SMTP / Exchange EWS)
-- احراز هویت JWT، Rate Limit ورود، لاگ ساختاریافته JSON، متریک Prometheus
-
-## معماری
+## Architecture
 
 ```
 Internet → Nginx (80/443) → Frontend (React) → Backend (Flask/Gunicorn :5002) → PostgreSQL + Redis
 ```
 
-## ساختار پروژه
+## Project Structure
 
 ```
-├── docker-compose.yml          # dev/internal (HTTP, بدون SSL)
+├── docker-compose.yml          # dev/internal (HTTP)
 ├── docker-compose.prod.yml     # production + SSL + monitoring
-├── .env.example                # نمونه متغیرها (کپی به .env)
-├── nginx/                      # کانفیگ Nginx
-├── app/                        # بک‌اند Flask
+├── .env.example                # copy to .env
+├── nginx/                      # Nginx configs
+├── app/                        # Flask backend
 │   ├── app.py
-│   ├── database.py             # pooling PostgreSQL + Redis
+│   ├── database.py             # PostgreSQL pooling + Redis
 │   ├── workflow.py
 │   ├── email_service.py
 │   ├── schema_postgres.sql
 │   └── alembic/
-├── frontend/                   # فرانت‌اند React
+├── frontend/                   # React + Vite
 └── monitoring/                 # Prometheus + Grafana
 ```
 
-## پیش‌نیازها
+## Prerequisites
 
-- Docker 24+ و Docker Compose v2
-- برای توسعه بدون Docker: Python 3.12+, Node 20+, PostgreSQL 16
+- Docker 24+ and Docker Compose v2
+- For local dev without Docker: Python 3.12+, Node 20+, PostgreSQL 16
 
-## شروع سریع (Docker)
+## Quick Start (Docker)
 
 ```bash
 cp .env.example .env
-# .env را باز کن و حداقل این‌ها را پر کن:
+# edit .env — at minimum:
 # MARINASAN_JWT_SECRET  (openssl rand -hex 32)
 # POSTGRES_PASSWORD     (openssl rand -base64 32)
 
 docker compose up -d --build
-docker compose exec backend python -m alembic upgrade head
-# یا برای شروع تمیز:
+docker compose exec backend alembic upgrade head
+# or fresh seed:
 docker compose exec backend python seed.py
 
-# لاگ‌ها
 docker compose logs -f
-
-# فرانت‌اند روی http://localhost
-# API روی http://localhost/api/health
+# Frontend: http://localhost
+# API health: http://localhost/api/health
 ```
 
-### Production (با SSL)
+### Production (with SSL)
 
 ```bash
 cp .env.production .env
-# مقادیر واقعی + دامنه را پر کن
+# fill real values + domain
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-## اجرای محلی بدون Docker
+## Local Development without Docker
 
 ```bash
 # Backend
@@ -79,9 +75,9 @@ cd app
 pip install -r requirements.txt
 export DATABASE_URL=postgresql://marinasan:pass@localhost:5432/marinasan
 export MARINASAN_JWT_SECRET=dev-secret
-python -m alembic upgrade head
+alembic upgrade head
 python seed.py
-python app.py  # یا gunicorn -c gunicorn_config.py 'app:create_app()'
+python app.py  # or: gunicorn -c gunicorn_config.py 'app:create_app()'
 
 # Frontend
 cd frontend
@@ -89,47 +85,48 @@ npm install
 npm run dev  # http://localhost:5173
 ```
 
-## متغیرهای محیطی مهم
+## Environment Variables
 
-| متغیر | الزامی | توضیح |
+| Variable | Required | Description |
 |---|---|---|
-| `MARINASAN_JWT_SECRET` | بله | حداقل ۳۲ بایت hex |
-| `POSTGRES_PASSWORD` | بله | پسورد دیتابیس |
-| `POSTGRES_USER/DB` | خیر | پیش‌فرض `marinasan` |
-| `SMTP_*` / `EWS_*` | خیر | برای اعلان ایمیل |
-| `CORS_ORIGINS` | خیر | لیست origins مجاز |
+| `MARINASAN_JWT_SECRET` | Yes | >=32 byte hex (`openssl rand -hex 32`) |
+| `POSTGRES_PASSWORD` | Yes | DB password |
+| `POSTGRES_USER` / `POSTGRES_DB` | No | default `marinasan` |
+| `SMTP_*` / `EWS_*` | No | email notifications |
+| `CORS_ORIGINS` | No | allowed origins |
 
-همه پسوردها را فقط در `.env` نگه دار — هرگز در `docker-compose.yml` هاردکد نکن.
+> Never hardcode secrets in `docker-compose.yml` — use `.env` only.
 
 ## API
 
-| متد | مسیر | توضیح |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/auth/login` | ورود با `personnel_number` + `password` |
-| POST | `/api/purchase-requests` | ایجاد درخواست |
-| GET | `/api/purchase-requests` | لیست درخواست‌های خودم |
-| GET | `/api/purchase-requests/:id` | جزئیات + مراحل + امضاها |
-| POST | `/api/purchase-requests/:id/decision` | تایید/رد |
-| GET | `/api/purchase-requests/pending-for-me` | کارتابل تایید |
-| GET | `/api/health` | سلامت سرویس |
+| POST | `/api/auth/login` | login with `personnel_number` + `password` |
+| POST | `/api/purchase-requests` | create request |
+| GET | `/api/purchase-requests` | list my requests |
+| GET | `/api/purchase-requests/:id` | detail + steps + signatures |
+| POST | `/api/purchase-requests/:id/decision` | approve / reject |
+| GET | `/api/purchase-requests/pending-for-me` | approval inbox |
+| GET | `/api/health` | health check |
+| GET | `/metrics` | Prometheus metrics |
 
-## کاربران نمونه (seed.py)
+## Demo Users (seed.py)
 
-| نام | سمت | پرسنلی | رمز |
+| Name | Role | Personnel | Password |
 |---|---|---|---|
-| رضا احمدی | کارشناس IT | 1204 | pass1204 |
-| سارا کریمی | مدیر IT | 0817 | pass0817 |
-| محسن حسینی | مدیر مالی | 0345 | pass0345 |
-| علیرضا رستمی | مدیرعامل | 0129 | pass0129 |
+| Reza Ahmadi | IT Specialist | 1204 | pass1204 |
+| Sara Karimi | IT Manager | 0817 | pass0817 |
+| Mohsen Hosseini | Finance Manager | 0345 | pass0345 |
+| Alireza Rostami | CEO | 0129 | pass0129 |
 
-## نکات امنیتی
+## Security Notes
 
-- `employee_id` از JWT خوانده می‌شود، نه از body
-- فقط approver مرحله جاری می‌تواند تصمیم بگیرد
-- امضاها با کپی نام/پرسنلی + IP + زمان ذخیره می‌شوند (تغییرناپذیر)
-- Rate limit ورود: ۵ تلاش در ۵ دقیقه (Redis یا in-memory)
+- `employee_id` is taken from JWT, not request body
+- Only the current step approver can decide
+- Signatures store a copy of name/personnel + IP + timestamp (immutable)
+- Login rate limit: 5 attempts / 5 min (Redis or in-memory fallback)
 
-## مانیتورینگ
+## Monitoring
 
 ```bash
 docker compose --profile monitoring up -d
@@ -138,6 +135,6 @@ curl http://localhost/api/health
 curl http://localhost/metrics
 ```
 
-## لایسنس
+## License
 
-MIT — فایل `LICENSE` را ببین.
+MIT — see `LICENSE`.
