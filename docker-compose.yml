@@ -1,0 +1,207 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------
+  # PostgreSQL - Primary Database
+  # ---------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: marinasan-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-marinasan}
+      POSTGRES_USER: ${POSTGRES_USER:-marinasan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./app/schema_postgres.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-marinasan} -d ${POSTGRES_DB:-marinasan}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - marinasan-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------
+  # Redis - Cache & Sessions
+  # ---------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: marinasan-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    networks:
+      - marinasan-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------
+  # Backend API - Flask + Gunicorn
+  # ---------------------------------------------------------
+  backend:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.prod
+    container_name: marinasan-backend
+    restart: unless-stopped
+    ports:
+      - "5002:5002"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-marinasan}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-marinasan}
+      - REDIS_URL=redis://redis:6379/0
+      - MARINASAN_JWT_SECRET=${MARINASAN_JWT_SECRET}
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Email settings - SMTP fallback
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-}
+      # Email settings - EWS (Exchange Web Services) - PRIMARY
+      - EMAIL_BACKEND=${EMAIL_BACKEND:-ews}
+      - EWS_ENABLED=${EWS_ENABLED:-false}
+      - EWS_URL=${EWS_URL:-}
+      - EWS_USERNAME=${EWS_USERNAME:-}
+      - EWS_PASSWORD=${EWS_PASSWORD:-}
+      - EWS_PRIMARY_SMTP=${EWS_PRIMARY_SMTP:-}
+      - EWS_DOMAIN=${EWS_DOMAIN:-}
+      - EMAIL_ENABLED=${EMAIL_ENABLED:-false}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - marinasan-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ---------------------------------------------------------
+  # Frontend - React + Nginx
+  # ---------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: marinasan-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - marinasan-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------
+  # Nginx - Reverse Proxy (HTTP only for internal)
+  # ---------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: marinasan-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.internal.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/dist:/var/www/frontend:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+    networks:
+      - marinasan-internal
+      - marinasan-external
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  marinasan-internal:
+    driver: bridge
+  marinasan-external:
+    driver: bridge

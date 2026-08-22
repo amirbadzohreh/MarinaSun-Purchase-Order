@@ -1,0 +1,33 @@
+# Production dependencies - pinned versions for reproducibility
+# Update via: pip install --upgrade pip && pip install -r requirements.txt && pip freeze > requirements.txt
+
+Flask==3.1.3
+PyJWT==2.8.0
+gunicorn==22.0.0
+psycopg2-binary==2.9.10
+Werkzeug==3.1.3
+Jinja2==3.1.6
+itsdangerous==2.2.0
+click==8.1.7
+blinker==1.9.0
+MarkupSafe==3.0.2
+
+# Security & Monitoring
+cryptography>=49.0.0
+pyOpenSSL==26.3.0
+prometheus-client==0.20.0
+
+# Database
+SQLAlchemy==2.0.36
+alembic==1.13.2
+
+# Caching
+redis==5.2.1
+
+# PDF Generation
+playwright==1.60.0
+
+# Utilities
+python-dotenv==1.0.1
+pytz==2024.2
+exchangelib>=5.0.0

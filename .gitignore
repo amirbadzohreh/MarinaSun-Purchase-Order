@@ -1,0 +1,78 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.production
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+marinasan.db
+
+# Logs
+*.log
+logs/
+app/server.log
+app/logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
+frontend/tsconfig.node.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Docker volumes (if using bind mounts)
+postgres_data/
+redis_data/
+prometheus_data/
+grafana_data/
+
+# Uploads & generated files
+app/uploads/
+uploads/
+certbot/conf/
+certbot/www/
+nginx_logs/
+printed_document.pdf
+*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Alembic cache
+app/alembic/__pycache__/

@@ -1,0 +1,114 @@
+# Production Dockerfile for Flask backend
+FROM python:3.12-slim AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    libgirepository1.0-dev \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libgdk-pixbuf-xlib-2.0-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Install Playwright and Chromium
+RUN python -m playwright install --with-deps chromium
+
+# Copy alembic for migrations
+COPY alembic alembic
+COPY alembic.ini .
+
+# Production stage
+FROM python:3.12-slim AS production
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    libgirepository-1.0-1 \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    libffi8 \
+    # Playwright dependencies
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libatspi2.0-0 \
+    libxshmfence1 \
+    libxss1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user
+RUN groupadd -g 1000 appgroup && \
+    useradd -u 1000 -g appgroup -m -s /bin/bash appuser
+
+WORKDIR /app
+
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /home/appuser/.local
+
+# Copy Playwright cache from builder
+COPY --from=builder /root/.cache/ms-playwright /home/appuser/.cache/ms-playwright
+
+# Copy application code
+COPY --chown=appuser:appgroup . .
+
+# Create necessary directories
+RUN mkdir -p /app/uploads /app/logs && \
+    chown -R appuser:appgroup /app/uploads /app/logs
+
+# Switch to non-root user
+USER appuser
+
+# Add local pip to PATH
+ENV PATH=/home/appuser/.local/bin:$PATH
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    FLASK_ENV=production \
+    GUNICORN_WORKERS=4 \
+    GUNICORN_THREADS=2 \
+    GUNICORN_TIMEOUT=60 \
+    GUNICORN_KEEPALIVE=5
+
+# Expose port
+EXPOSE 5002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:5002/api/health || exit 1
+
+# Start with Gunicorn
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:5002 \
+    --workers ${GUNICORN_WORKERS:-4} \
+    --threads ${GUNICORN_THREADS:-2} \
+    --timeout ${GUNICORN_TIMEOUT:-60} \
+    --keep-alive ${GUNICORN_KEEPALIVE:-5} \
+    --max-requests 1000 \
+    --max-requests-jitter 50 \
+    --access-logfile - \
+    --error-logfile - \
+    --log-level info \
+    --capture-output \
+    'app:create_app()'"]

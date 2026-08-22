@@ -1,0 +1,115 @@
+{
+  "dashboard": {
+    "title": "Marinasan Purchase System",
+    "tags": ["marinasan", "purchase", "production"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "title": "API Request Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{path}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [{"format": "reqps"}, {"format": "short"}]
+      },
+      {
+        "title": "API Response Time (p95)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{path}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [{"format": "s"}, {"format": "short"}]
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "5xx errors",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(http_requests_total{status=~\"4..\"}[5m])",
+            "legendFormat": "4xx errors",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [{"format": "reqps"}, {"format": "short"}]
+      },
+      {
+        "title": "Active Connections",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "nginx_connections_active",
+            "legendFormat": "Active",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "title": "Database Connections",
+        "type": "graph",
+        "gridPos": {"x": 18, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends",
+            "legendFormat": "Connections",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "title": "Purchase Requests Status",
+        "type": "piechart",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "count by (status) (purchase_requests_total)",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "title": "Daily Request Volume",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "increase(purchase_requests_created_total[1d])",
+            "legendFormat": "Created",
+            "refId": "A"
+          },
+          {
+            "expr": "increase(purchase_requests_approved_total[1d])",
+            "legendFormat": "Approved",
+            "refId": "B"
+          },
+          {
+            "expr": "increase(purchase_requests_rejected_total[1d])",
+            "legendFormat": "Rejected",
+            "refId": "C"
+          }
+        ]
+      }
+    ],
+    "time": {"from": "now-6h", "to": "now"},
+    "timepicker": {"refresh_intervals": ["30s", "1m", "5m", "15m", "30m", "1h", "2h", "6h", "12h", "24h"]}
+  },
+  "overwrite": true
+}

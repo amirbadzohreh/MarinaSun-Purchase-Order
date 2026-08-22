@@ -1,0 +1,21 @@
+{
+  "name": "ماریناسان | سیستم درخواست خرید",
+  "short_name": "ماریناسان",
+  "description": "سیستم درخواست خرید ماریناسان",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "fa",
+  "dir": "rtl"
+}

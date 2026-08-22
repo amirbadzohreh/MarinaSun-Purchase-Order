@@ -1,0 +1,30 @@
+# Backend production Dockerfile
+# NOTE: your project had a filename collision - "Dockerfile.prod" existed for
+# both app/ (backend) and frontend/ (React) with different content, and only
+# the frontend one survived in the last upload. Keep these as two distinct
+# files: app/Dockerfile.prod (this file) and frontend/Dockerfile.prod.
+
+FROM python:3.12-slim AS base
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# gunicorn_config.py binds 0.0.0.0:5002
+EXPOSE 5002
+
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser \
+    && chown -R appuser:appgroup /app
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:5002/api/health || exit 1
+
+CMD ["gunicorn", "-c", "gunicorn_config.py", "app:app"]
